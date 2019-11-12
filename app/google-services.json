@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "1069645846300",
+    "firebase_url": "https://go-kozo.firebaseio.com",
+    "project_id": "go-kozo",
+    "storage_bucket": "go-kozo.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1069645846300:android:d61a9b566565714843ccd9",
+        "android_client_info": {
+          "package_name": "com.binarynumbers.gokozo"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1069645846300-qige57pujnp1hkfaju5jq5vomn4ob31q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD71N-hR44JSMAwhMSiX6SGA6IUJt3RXJ8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1069645846300-qige57pujnp1hkfaju5jq5vomn4ob31q.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
