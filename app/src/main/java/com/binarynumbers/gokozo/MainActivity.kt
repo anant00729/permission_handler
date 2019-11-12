@@ -100,20 +100,10 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
             OnSuccessListener<InstanceIdResult> { instanceIdResult ->
                 val token = instanceIdResult.token
                 webinterface.token = token
-
-
                 val preference=getSharedPreferences(resources.getString(R.string.app_name), Context.MODE_PRIVATE)
                 val editor=preference.edit()
                 editor.putString("Token",token)
                 editor.apply()
-
-
-
-
-
-                print(webinterface);
-                //wb_view.evaluateJavascript("javascript:window.Android.saveFCM()")
-
             })
 
 
