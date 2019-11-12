@@ -1,31 +1,28 @@
 package com.binarynumbers.gokozo
 
-import androidx.appcompat.app.AppCompatActivity
-import android.os.Bundle
-import android.webkit.WebView
-import kotlinx.android.synthetic.main.activity_main.*
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Bundle
 import android.os.Handler
 import android.view.KeyEvent
+import android.view.KeyEvent.KEYCODE_BACK
+import android.webkit.WebView
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
+import com.google.android.gms.tasks.OnSuccessListener
+import com.google.firebase.FirebaseApp
+import com.google.firebase.dynamiclinks.FirebaseDynamicLinks
+import com.google.firebase.iid.FirebaseInstanceId
+import com.google.firebase.iid.InstanceIdResult
+import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.android.synthetic.main.activity_main.*
+
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
-import android.view.KeyEvent.KEYCODE_BACK
-import com.google.firebase.FirebaseApp
-import com.google.firebase.dynamiclinks.FirebaseDynamicLinks
-import com.google.firebase.messaging.FirebaseMessaging
-import android.webkit.ValueCallback
-import androidx.core.app.ComponentActivity
-import androidx.core.app.ComponentActivity.ExtraData
-import androidx.core.content.ContextCompat.getSystemService
-import android.icu.lang.UCharacter.GraphemeClusterBreak.T
-
-
-
 
 
 class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
@@ -61,6 +58,8 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
         setting.javaScriptEnabled = true
 
 
+        var webinterface = WebInterface(this, this)
+
         wb_view.addJavascriptInterface(WebInterface(this, this), "Android")
 
         setting.loadWithOverviewMode = true
@@ -83,18 +82,41 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
         this.webView = wb_view
 
 
-        wb_view.loadUrl("javascript:window.Android.firebase = 'Hi!';");
+//        wb_view.loadUrl("javascript:window.Android.firebase = 'Hi!';");
+//
+//
+//        wb_view.evaluateJavascript("javascript:window.Android.firebase = 'Hi!';");
+//
+//        wb_view.loadUrl("javascript:window.firebase = 'Hi!';");
+//        wb_view.evaluateJavascript("javascript:window.firebase = 'Hi!';");
+//        wb_view.evaluateJavascript("javascript:localStorage.setItem('test','firebasetest')");
+//
+//        wb_view.loadUrl("javascript:localStorage.setItem('test','firebasetest')");
+//        wb_view.loadUrl("javascript:window.Android.showToast('asjdhjkashdkasjdhkashdasjkdhkajshdkahdjashdkasdh')");
 
 
-        wb_view.evaluateJavascript("javascript:window.Android.firebase = 'Hi!';");
 
-        wb_view.loadUrl("javascript:window.firebase = 'Hi!';");
-        wb_view.evaluateJavascript("javascript:window.firebase = 'Hi!';");
-        wb_view.evaluateJavascript("javascript:localStorage.setItem('test','firebasetest')");
+        FirebaseInstanceId.getInstance().instanceId.addOnSuccessListener(this@MainActivity,
+            OnSuccessListener<InstanceIdResult> { instanceIdResult ->
+                val token = instanceIdResult.token
+                webinterface.token = token
 
-        wb_view.loadUrl("javascript:localStorage.setItem('test','firebasetest')");
-        wb_view.loadUrl("javascript:window.Android.showToast('asjdhjkashdkasjdhkashdasjkdhkajshdkahdjashdkasdh')");
-        wb_view.evaluateJavascript("javascript:window.Android.showToast('asjdhjkashdkasjdhkashdasjkdhkajshdkahdjashdkasdh')");
+
+                val preference=getSharedPreferences(resources.getString(R.string.app_name), Context.MODE_PRIVATE)
+                val editor=preference.edit()
+                editor.putString("Token",token)
+                editor.apply()
+
+
+
+
+
+                print(webinterface);
+                //wb_view.evaluateJavascript("javascript:window.Android.saveFCM()")
+
+            })
+
+
         //wb_view.loadData("javascript:localStorage.setItem('test','firebasetest')");
 
 
