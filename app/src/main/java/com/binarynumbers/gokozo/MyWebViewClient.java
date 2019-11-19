@@ -42,17 +42,17 @@ class MyWebViewClient extends WebViewClient {
     @Override
     public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
 
-        Log.e(TAG, "shouldInterceptRequest: " );
-
-
-        String exit_url = "https://peoplemattersapi.binarynumbers.io/bigNews";
-        if(request.getUrl().equals(exit_url)){
-            if (this.exitCallback != null) {
-                this.exitCallback.onExit(true);
-            }
-        }else {
-            this.exitCallback.onExit(false);
-        }
+//        Log.e(TAG, "shouldInterceptRequest: " );
+//
+//
+//        String exit_url = "https://peoplemattersapi.binarynumbers.io/bigNews";
+//        if(request.getUrl().equals(exit_url)){
+//            if (this.exitCallback != null) {
+//                this.exitCallback.onExit(true);
+//            }
+//        }else {
+//            this.exitCallback.onExit(false);
+//        }
 
 
 

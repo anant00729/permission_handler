@@ -1,13 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
               android:orientation="vertical"
               android:layout_width="match_parent"
               android:layout_height="match_parent">
 
 
-    <ImageView
-            android:scaleType="centerCrop"
-            android:id="@+id/web_view"
-            android:layout_width="match_parent" android:layout_height="match_parent"/>
+<!--    <ImageView-->
+<!--            android:src="@color/colorAccent"-->
+<!--            android:scaleType="centerCrop"-->
+<!--            android:id="@+id/web_view"-->
+<!--            android:layout_width="match_parent"-->
+<!--            android:layout_height="match_parent"/>-->
 
-</LinearLayout>
+
+    <ImageView
+            android:src="@drawable/splash"
+            android:scaleType="centerCrop"
+            android:id="@+id/img"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
+
+</RelativeLayout>

@@ -2,6 +2,7 @@ package com.binarynumbers.gokozo;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 
@@ -47,6 +48,21 @@ public class WebInterface {
         String _t = preference.getString("Token","");
         return _t;
     }
+
+
+    @JavascriptInterface
+    public String getPhoneModel() {
+        return Build.MODEL;
+    }
+
+
+
+
+    @JavascriptInterface
+    public String getDeviceType() {
+        return "Android";
+    }
+
 
 
 

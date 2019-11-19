@@ -33,38 +33,38 @@ class SplashActivity : AppCompatActivity() {
         //
 
 
-        Glide.with(this)
-            .load("file:///android_asset/animation2.gif")
-            .listener(object : RequestListener<Drawable> {
-                override fun onLoadFailed(
-                    e: GlideException?,
-                    model: Any,
-                    target: Target<Drawable>,
-                    isFirstResource: Boolean
-                ): Boolean {
-
-
-
-
-                    return false
-                }
-
-                override fun onResourceReady(
-                    resource: Drawable,
-                    model: Any,
-                    target: Target<Drawable>,
-                    dataSource: DataSource,
-                    isFirstResource: Boolean
-                ): Boolean {
-
-                    if (resource is GifDrawable) {
-                        resource.setLoopCount(1)
-                    }
-
-                    return false
-                }
-            })
-        .into(web_view)
+//        Glide.with(this)
+//            .load("file:///android_asset/animation2.gif")
+//            .listener(object : RequestListener<Drawable> {
+//                override fun onLoadFailed(
+//                    e: GlideException?,
+//                    model: Any,
+//                    target: Target<Drawable>,
+//                    isFirstResource: Boolean
+//                ): Boolean {
+//
+//
+//
+//
+//                    return false
+//                }
+//
+//                override fun onResourceReady(
+//                    resource: Drawable,
+//                    model: Any,
+//                    target: Target<Drawable>,
+//                    dataSource: DataSource,
+//                    isFirstResource: Boolean
+//                ): Boolean {
+//
+//                    if (resource is GifDrawable) {
+//                        resource.setLoopCount(1)
+//                    }
+//
+//                    return false
+//                }
+//            })
+//        .into(web_view)
 
 //        Glide.with(this)
 //            .load("file:///android_asset/animation2.gif")
@@ -91,7 +91,7 @@ class SplashActivity : AppCompatActivity() {
             val intent = Intent(this, MainActivity::class.java)
             startActivity(intent)
             finish()
-        }, 12500)
+        }, 2000)
 
     }
 

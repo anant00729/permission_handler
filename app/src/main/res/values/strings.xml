@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">People Matters</string>
+    <string name="app_name">Kozo</string>
     <string name="version">Ver 1.0</string>
-    <string name="exit_msg">Press again to exit People Matters</string>
+    <string name="exit_msg">Press again to exit Kozo</string>
 </resources>
