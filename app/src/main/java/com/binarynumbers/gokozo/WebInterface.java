@@ -56,12 +56,32 @@ public class WebInterface {
     }
 
 
+    @JavascriptInterface
+    public String openGallery() {
+        mL.openGallery();
+        Log.e(TAG, "openGallery: ");
+        return "";
+    }
+
+
+    @JavascriptInterface
+    public String openCamera() {
+        mL.openCamera();
+        Log.e(TAG, "openCamera: " );
+        return Build.MODEL;
+    }
 
 
     @JavascriptInterface
     public String getDeviceType() {
         return "Android";
     }
+
+
+//    @JavascriptInterface
+//    public String setImage(String image) {
+//        return "Android";
+//    }
 
 
 

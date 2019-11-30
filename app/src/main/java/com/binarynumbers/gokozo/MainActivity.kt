@@ -6,6 +6,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.database.Cursor
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
@@ -26,13 +27,28 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.lifecycle.ViewModelProviders
+import com.binarynumbers.gokozo.models.ImageRes
+import com.binarynumbers.gokozo.netwoking.RetrofitClient
+import com.binarynumbers.gokozo.netwoking.ServiceAPI
+import com.binarynumbers.gokozo.vm.MainVM
 import com.google.android.gms.tasks.OnSuccessListener
 import com.google.firebase.FirebaseApp
 import com.google.firebase.dynamiclinks.FirebaseDynamicLinks
 import com.google.firebase.iid.FirebaseInstanceId
 import com.google.firebase.iid.InstanceIdResult
 import com.google.firebase.messaging.FirebaseMessaging
+import io.reactivex.android.schedulers.AndroidSchedulers
+import io.reactivex.disposables.CompositeDisposable
+import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_main.*
+import okhttp3.MediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import pub.devrel.easypermissions.EasyPermissions
+import retrofit2.Response
+import retrofit2.http.Part
+import java.io.ByteArrayOutputStream
 
 import java.io.File
 import java.io.FileOutputStream
@@ -76,12 +92,18 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
     }
 
 
+    //lateinit var mLVM: MainVM
+    lateinit var bitmap: Bitmap
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
 
 
         setContentView(R.layout.activity_main)
+        //mLVM = ViewModelProviders.of(this).get(MainVM::class.java)
+        _observe()
+
 
         var setting = wb_view.settings
         setting.javaScriptEnabled = true
@@ -109,6 +131,9 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
 
         webView?.setOnLongClickListener { true }
         webView?.isHapticFeedbackEnabled = false
+
+
+
 
 
 
@@ -183,15 +208,15 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
                 }
             }
 
-//            //Getting webview rendering progress
-//            override fun onProgressChanged(view: WebView, p: Int) {
+            //Getting webview rendering progress
+            override fun onProgressChanged(view: WebView, p: Int) {
 //                if (ASWP_PBAR) {
 //                    asw_progress.progress = p
 //                    if (p == 100) {
 //                        asw_progress.progress = 0
 //                    }
 //                }
-//            }
+            }
 
             // overload the geoLocations permissions prompt to always allow instantly as app permission was granted previously
 //            override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
@@ -243,6 +268,18 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
     }
 
 
+    internal lateinit var mSAPI : ServiceAPI
+    internal lateinit var mCD : CompositeDisposable
+
+    private fun _observe() {
+
+        val mR = RetrofitClient.instance
+        mSAPI = mR.create(ServiceAPI::class.java)
+        mCD = CompositeDisposable()
+
+    }
+
+
     //Creating image file for upload
     @Throws(IOException::class)
     private fun create_image(): File {
@@ -275,7 +312,7 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
     //Checking if particular permission is given or not
     fun check_permission(permission: Int): Boolean {
         when (permission) {
-            1 -> return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            //1 -> return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
             2 -> return ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
 
@@ -304,7 +341,7 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
                 if (keyCode == KEYCODE_BACK && it.canGoBack()) {
                     it.url?.let { _url ->
 
-                        if("https://gokozo.binarynumbers.io/daily-feeds" == _url){
+                        if("https://app-dev.gokozo.com/index1.html" == _url){
                             is_exit_called = true
                         }else{
                             is_exit_called = false
@@ -325,8 +362,13 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
     }
 
 
+
+
     override fun onShare(shareContent: String?) {
         shareContent?.let {
+
+
+            Toast.makeText(this@MainActivity, "", Toast.LENGTH_LONG).show()
 
             val b = ScreenShot.takescreenshotOfRootView(wb_view,wb_view.width, wb_view.height);
 
@@ -340,6 +382,7 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
 //            startActivity(Intent.createChooser(shareIntent,"asdhjkashd"))
         }
     }
+
 
 
     private fun saveImage(image: Bitmap): Uri? {
@@ -395,53 +438,6 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
     }
 
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
-        super.onActivityResult(requestCode, resultCode, intent)
-        if (Build.VERSION.SDK_INT >= 21) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-            if (Build.VERSION.SDK_INT >= 23) {
-                window.statusBarColor = this.getResources().getColor(R.color.colorPrimary, this.getTheme())
-            } else {
-                window.statusBarColor = this.getResources().getColor(R.color.colorPrimary)
-            }
-            var results: Array<Uri>? = null
-            if (resultCode == Activity.RESULT_OK) {
-                if (requestCode == asw_file_req) {
-                    if (null == asw_file_path) {
-                        return
-                    }
-                    if (intent == null || intent.data == null) {
-                        if (asw_cam_message != null) {
-                            results = arrayOf(Uri.parse(asw_cam_message))
-                        }
-                    } else {
-                        val dataString = intent.dataString
-                        if (dataString != null) {
-                            results = arrayOf(Uri.parse(dataString))
-                        } else {
-                            /*if (ASWP_MULFILE) {
-                                if (intent.clipData != null) {
-                                    val numSelectedFiles = intent.clipData!!.itemCount
-                                    for (i in 0 until numSelectedFiles) {
-                                        results[i] = intent.clipData!!.getItemAt(i).uri
-                                    }
-                                }
-                            }*/
-                        }
-                    }
-                }
-            }
-            asw_file_path!!.onReceiveValue(results)
-            asw_file_path = null
-        } else {
-            if (requestCode == asw_file_req) {
-                if (null == asw_file_message) return
-                val result = if (intent == null || resultCode != Activity.RESULT_OK) null else intent.data
-                asw_file_message!!.onReceiveValue(result)
-                asw_file_message = null
-            }
-        }
-    }
 
 
 
@@ -458,7 +454,7 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
 
 
 
-        //wb_view.loadUrl("https://app-dev.gokozo.com")
+        //wb_view.loadUrl("https://app-dev.gokozo.com/index1.html")
 
         FirebaseApp.initializeApp(this)
         FirebaseDynamicLinks.getInstance()
@@ -470,9 +466,6 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
                     deepLink = pendingDynamicLinkData.link
 
                     print(deepLink)
-
-
-
 //                    is_from_dynamic_link = true
 //
 //
@@ -480,12 +473,12 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
 
                     print(data)
 
-                    wb_view.loadUrl("https://app-dev.gokozo.com" + deepLink.path)
+                    wb_view.loadUrl("https://app-dev.gokozo.com/index1.html" + deepLink.path)
 
                     //pendingDynamicLinkData.getLink().
                 }else {
 
-                    wb_view.loadUrl("https://app-dev.gokozo.com")
+                    wb_view.loadUrl("https://app-dev.gokozo.com/index1.html")
 //                    mMVM.getMovieDatails(this, mov_id)
 //                    mMVM.getSpShowTimes(this, null, mov_id, schID, false)
                 }
@@ -494,10 +487,223 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
     }
 
 
+    override fun openCamera() {
+
+
+
+    }
+
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+
+
+        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, MainActivity@this)
+//        when(requestCode){
+//
+//
+//            456 -> {
+//                if(grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
+//                    pickImageFromGallery()
+//                }else {
+//                    Toast.makeText(this, "Permission Denied" , Toast.LENGTH_LONG).show()
+//                }
+//            }
+//        }
+    }
+
+    private fun pickImageFromGallery() {
+        val intent = Intent(Intent.ACTION_PICK)
+        intent.type ="image/*"
+        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        intent.action = Intent.ACTION_GET_CONTENT
+        startActivityForResult(intent, 123)
+    }
+
+
+    override fun openGallery() {
+        if(Build.VERSION.SDK_INT > Build.VERSION_CODES.M){
+            if(checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED){
+                val permission = arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+                requestPermissions(permission, 456)
+            }else {
+                pickImageFromGallery()
+            }
+        }else {
+            pickImageFromGallery()
+        }
+    }
+
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {
+        if(resultCode == Activity.RESULT_OK && requestCode == 123){
+
+
+            //val filePath = intent?.data?.let { getRealPathFromURIPath(it, MainActivity@this) }
+
+
+            try{
+
+                bitmap = MediaStore.Images.Media.getBitmap(contentResolver, intent?.data)
+
+                imageToString()
+
+                val path = ImageFilePath.getPath(MainActivity@this, intent?.data)
+
+                var file = File(path)
+
+                val propertyImage = RequestBody.create(MediaType.parse("image/*"), file)
+                val p = MultipartBody.Part.createFormData("file", file.name, propertyImage)
+                mCD.add(mSAPI.uploadImage(p)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe ({res -> onImageUploadRes(res)}, {e -> onGetError(e)}))
+
+
+            }catch (e : IOException){
+                print(e.toString())
+            }
+
+
+
+
+            //val surveyImagesParts = arrayOf(MultipartBody.Part);
+
+
+
+
+            //val file = File()
+
+            //val propertyImageFile = File()
+
+//    var propertyImagePart = MultipartBody.Part.createFormData("PropertyImage", propertyImageFile.getName(), propertyImage);
+//
+//    val surveyImagesParts = MultipartBody.Part[surveyModel.getPicturesList().size()];
+//
+//    for (int index = 0; index < surveyModel.getPicturesList().size(); index++) {
+//        Log.d(TAG, "requestUploadSurvey: survey image " + index + "  " + surveyModel.getPicturesList().get(index).getImagePath());
+//        File file = new File(surveyModel.getPicturesList().get(index).getImagePath());
+//        RequestBody surveyBody = RequestBody.create(MediaType.parse("image/*"), file);
+//        surveyImagesParts[index] = MultipartBody.Part.createFormData("SurveyImage", file.getName(), surveyBody);
+//    }
+//
+//    final WebServicesAPI webServicesAPI = RetrofitManager.getInstance().getRetrofit().create(WebServicesAPI.class);
+//    Call<UploadSurveyResponseModel> surveyResponse = null;
+//    if (surveyImagesParts != null) {
+//        surveyResponse = webServicesAPI.uploadSurvey(surveyImagesParts, propertyImagePart, draBody);
+//    }
+//    surveyResponse.enqueue(this);
+        }
+
+
+
+//        if (Build.VERSION.SDK_INT >= 21) {
+//            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+//            if (Build.VERSION.SDK_INT >= 23) {
+//                window.statusBarColor =
+//                    this.getResources().getColor(R.color.colorPrimary, this.getTheme())
+//            } else {
+//                window.statusBarColor = this.getResources().getColor(R.color.colorPrimary)
+//            }
+//            var results: Array<Uri>? = null
+//            if (resultCode == Activity.RESULT_OK) {
+//                if (requestCode == asw_file_req) {
+//                    if (null == asw_file_path) {
+//                        return
+//                    }
+//
+//
+//
+//                    if (intent == null || intent.data == null) {
+//                        if (asw_cam_message != null) {
+//                            results = arrayOf(Uri.parse(asw_cam_message))
+//                        }
+//                    } else {
+//
+//
+//
+//
+//                        val dataString = intent.dataString
+//                        if (dataString != null) {
+//                            results = arrayOf(Uri.parse(dataString))
+//                        } else {
+//                            if (ASWP_MULFILE) {
+////                                if (intent.clipData != null) {
+////                                    val numSelectedFiles = intent.clipData!!.itemCount
+////                                    for (i in 0 until numSelectedFiles) {
+////                                        results[i] = intent.clipData!!.getItemAt(i).uri
+////                                    }
+////                                }
+//                            }
+//                        }
+//                    }
+//
+//
+//                }
+//            }
+//
+//
+//
+//
+//
+//            /*Thread({
+//
+//            }).start()
+//*/
+//
+//        }
+
+    }
+
+
+    private fun imageToString() : String{
+        val barray = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100 , barray)
+        val imgByte = barray.toByteArray()
+        return MediaStore.Images.Media.insertImage(contentResolver, bitmap,"Title",null)
+
+    }
+
+     private fun getRealPathFromURIPath(contentURI : Uri , activity : Activity) : String {
+        var cursor = activity?.contentResolver?.query(contentURI, null, null, null, null)
+        if (cursor == null) {
+            return contentURI.path.toString()
+        } else {
+            cursor.moveToFirst()
+            val idx = cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA)
+            return cursor.getString(idx)
+        }
+    }
+
+    private fun onGetError(e: Throwable?) {
+        print(e)
+    }
+
+    private fun onImageUploadRes(res: Response<ImageRes>?) {
+
+
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            webView?.evaluateJavascript("javascript:setImage(\"" + res?.body()?.data?.image_path + "\");") {
+                v ->
+                print(v)
+            }
+        } else {
+            webView?.loadUrl("javascript:setImage(\"" + res?.body()?.data?.image_path + "\");")
+        }
+
+
+
+
+    }
+
+
 }
 
-private fun WebView.evaluateJavascript(s: String) {
 
-}
+
 
 
