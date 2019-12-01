@@ -3,10 +3,11 @@ package com.binarynumbers.gokozo
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.ProgressDialog
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.database.Cursor
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
@@ -17,21 +18,13 @@ import android.provider.MediaStore
 import android.util.Log
 import android.view.KeyEvent
 import android.view.KeyEvent.KEYCODE_BACK
-import android.view.WindowManager
-import android.webkit.GeolocationPermissions
-import android.webkit.ValueCallback
-import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import androidx.lifecycle.ViewModelProviders
 import com.binarynumbers.gokozo.models.ImageRes
 import com.binarynumbers.gokozo.netwoking.RetrofitClient
 import com.binarynumbers.gokozo.netwoking.ServiceAPI
-import com.binarynumbers.gokozo.vm.MainVM
 import com.google.android.gms.tasks.OnSuccessListener
 import com.google.firebase.FirebaseApp
 import com.google.firebase.dynamiclinks.FirebaseDynamicLinks
@@ -45,11 +38,8 @@ import kotlinx.android.synthetic.main.activity_main.*
 import okhttp3.MediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
-import pub.devrel.easypermissions.EasyPermissions
 import retrofit2.Response
-import retrofit2.http.Part
 import java.io.ByteArrayOutputStream
-
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -61,22 +51,27 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
 
 
 
-    private val asw_file_req = 1
-    private var asw_file_path: ValueCallback<Array<Uri>>? = null
-    private var asw_cam_message: String? = null
-    private var asw_file_message: ValueCallback<Uri>? = null
+//    private val asw_file_req = 1
+//    private var asw_file_path: ValueCallback<Array<Uri>>? = null
+//    private var asw_cam_message: String? = null
+//    private var asw_file_message: ValueCallback<Uri>? = null
+//
+//    internal var ASWP_FUPLOAD = true
+//    internal var ASWV_F_TYPE = "*/*"
+//    internal var ASWP_MULFILE = true
+//    internal var ASWP_CAMUPLOAD = true
+//    internal var ASWP_ONLYCAM = true
+//    internal var ASWP_PBAR = false
 
-    internal var ASWP_FUPLOAD = true
-    internal var ASWV_F_TYPE = "*/*"
-    internal var ASWP_MULFILE = true
-    internal var ASWP_CAMUPLOAD = true
-    internal var ASWP_ONLYCAM = true
-    internal var ASWP_PBAR = false
+    internal var cam_photo_path = ""
 
     // show progress bar in app
     private val TAG = MainActivity::class.java.getSimpleName()
 
     private val file_perm = 2
+
+    internal lateinit var cam_file : File
+    internal lateinit var cam_uri_photo : Uri
 
     override fun onShareLink(link: String?) {
         val shareBody = "Here is the share content body"
@@ -86,6 +81,8 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
         startActivity(sharingIntent)
     }
 
+
+    lateinit var mPD: ProgressDialog
 
 
     override fun onExit() {
@@ -98,6 +95,9 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+
+
+        iniProgress()
 
 
         setContentView(R.layout.activity_main)
@@ -132,103 +132,113 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
         webView?.setOnLongClickListener { true }
         webView?.isHapticFeedbackEnabled = false
 
+        FirebaseInstanceId.getInstance().instanceId.addOnSuccessListener(this@MainActivity,
+            OnSuccessListener<InstanceIdResult> { instanceIdResult ->
+                val token = instanceIdResult.token
+                webinterface.token = token
+                val preference=getSharedPreferences(resources.getString(R.string.app_name), Context.MODE_PRIVATE)
+                val editor=preference.edit()
+                editor.putString("Token",token)
+                editor.apply()
+            })
 
 
 
 
 
-        webView?.webChromeClient = object : WebChromeClient() {
-            //Handling input[type="file"] requests for android API 16+
-            fun openFileChooser(uploadMsg: ValueCallback<Uri>, acceptType: String, capture: String) {
-                if (ASWP_FUPLOAD) {
-                    asw_file_message = uploadMsg
-                    val i = Intent(Intent.ACTION_GET_CONTENT)
-                    i.addCategory(Intent.CATEGORY_OPENABLE)
-                    i.type = ASWV_F_TYPE
-                    if (ASWP_MULFILE) {
-                        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                    }
-                    startActivityForResult(Intent.createChooser(i, getString(R.string.fl_chooser)), asw_file_req)
-                }
-            }
 
-            //Handling input[type="file"] requests for android API 21+
-            override fun onShowFileChooser(webView: WebView, filePathCallback: ValueCallback<Array<Uri>>, fileChooserParams: WebChromeClient.FileChooserParams): Boolean {
-                if (check_permission(2) && check_permission(3)) {
-                    if (ASWP_FUPLOAD) {
-                        if (asw_file_path != null) {
-                            asw_file_path!!.onReceiveValue(null)
-                        }
-                        asw_file_path = filePathCallback
-                        var takePictureIntent: Intent? = null
-                        if (ASWP_CAMUPLOAD) {
-                            takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-                            if (takePictureIntent.resolveActivity(this@MainActivity.packageManager) != null) {
-                                var photoFile: File? = null
-                                try {
-                                    photoFile = create_image()
-                                    takePictureIntent.putExtra("PhotoPath", asw_cam_message)
-                                } catch (ex: IOException) {
-                                    Log.e(TAG, "Image file creation failed", ex)
-                                }
-
-                                if (photoFile != null) {
-                                    asw_cam_message = "file:" + photoFile.absolutePath
-                                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(photoFile))
-                                } else {
-                                    takePictureIntent = null
-                                }
-                            }
-                        }
-                        val contentSelectionIntent = Intent(Intent.ACTION_GET_CONTENT)
-                        if (!ASWP_ONLYCAM) {
-                            contentSelectionIntent.addCategory(Intent.CATEGORY_OPENABLE)
-                            contentSelectionIntent.type = ASWV_F_TYPE
-                            if (ASWP_MULFILE) {
-                                contentSelectionIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                            }
-                        }
-                        val intentArray: Array<Intent?>
-                        if (takePictureIntent != null) {
-                            intentArray = arrayOf(takePictureIntent)
-                        } else {
-                            intentArray = arrayOfNulls<Intent>(0)
-                        }
-
-                        val chooserIntent = Intent(Intent.ACTION_CHOOSER)
-                        chooserIntent.putExtra(Intent.EXTRA_INTENT, contentSelectionIntent)
-                        chooserIntent.putExtra(Intent.EXTRA_TITLE, getString(R.string.fl_chooser))
-                        chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, intentArray)
-                        startActivityForResult(chooserIntent, asw_file_req)
-                    }
-                    return true
-                } else {
-                    get_file()
-                    return false
-                }
-            }
-
-            //Getting webview rendering progress
-            override fun onProgressChanged(view: WebView, p: Int) {
-//                if (ASWP_PBAR) {
-//                    asw_progress.progress = p
-//                    if (p == 100) {
-//                        asw_progress.progress = 0
+//        webView?.webChromeClient = object : WebChromeClient() {
+//            //Handling input[type="file"] requests for android API 16+
+//            fun openFileChooser(uploadMsg: ValueCallback<Uri>, acceptType: String, capture: String) {
+//                if (ASWP_FUPLOAD) {
+//                    asw_file_message = uploadMsg
+//                    val i = Intent(Intent.ACTION_GET_CONTENT)
+//                    i.addCategory(Intent.CATEGORY_OPENABLE)
+//                    i.type = ASWV_F_TYPE
+//                    if (ASWP_MULFILE) {
+//                        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
 //                    }
-//                }
-            }
-
-            // overload the geoLocations permissions prompt to always allow instantly as app permission was granted previously
-//            override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
-//                if (Build.VERSION.SDK_INT < 23 || check_permission(1)) {
-//                    // location permissions were granted previously so auto-approve
-//                    callback.invoke(origin, true, false)
-//                } else {
-//                    // location permissions not granted so request them
-//                    ActivityCompat.requestPermissions(this@MainActivity, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), loc_perm)
+//                    startActivityForResult(Intent.createChooser(i, getString(R.string.fl_chooser)), asw_file_req)
 //                }
 //            }
-        }
+//
+//            //Handling input[type="file"] requests for android API 21+
+//            override fun onShowFileChooser(webView: WebView, filePathCallback: ValueCallback<Array<Uri>>, fileChooserParams: WebChromeClient.FileChooserParams): Boolean {
+//                if (check_permission(2) && check_permission(3)) {
+//                    if (ASWP_FUPLOAD) {
+//                        if (asw_file_path != null) {
+//                            asw_file_path!!.onReceiveValue(null)
+//                        }
+//                        asw_file_path = filePathCallback
+//                        var takePictureIntent: Intent? = null
+//                        if (ASWP_CAMUPLOAD) {
+//                            takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+//                            if (takePictureIntent.resolveActivity(this@MainActivity.packageManager) != null) {
+//                                var photoFile: File? = null
+//                                try {
+//                                    photoFile = create_image()
+//                                    takePictureIntent.putExtra("PhotoPath", asw_cam_message)
+//                                } catch (ex: IOException) {
+//                                    Log.e(TAG, "Image file creation failed", ex)
+//                                }
+//
+//                                if (photoFile != null) {
+//                                    asw_cam_message = "file:" + photoFile.absolutePath
+//                                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(photoFile))
+//                                } else {
+//                                    takePictureIntent = null
+//                                }
+//                            }
+//                        }
+//                        val contentSelectionIntent = Intent(Intent.ACTION_GET_CONTENT)
+//                        if (!ASWP_ONLYCAM) {
+//                            contentSelectionIntent.addCategory(Intent.CATEGORY_OPENABLE)
+//                            contentSelectionIntent.type = ASWV_F_TYPE
+//                            if (ASWP_MULFILE) {
+//                                contentSelectionIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+//                            }
+//                        }
+//                        val intentArray: Array<Intent?>
+//                        if (takePictureIntent != null) {
+//                            intentArray = arrayOf(takePictureIntent)
+//                        } else {
+//                            intentArray = arrayOfNulls<Intent>(0)
+//                        }
+//
+//                        val chooserIntent = Intent(Intent.ACTION_CHOOSER)
+//                        chooserIntent.putExtra(Intent.EXTRA_INTENT, contentSelectionIntent)
+//                        chooserIntent.putExtra(Intent.EXTRA_TITLE, getString(R.string.fl_chooser))
+//                        chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, intentArray)
+//                        startActivityForResult(chooserIntent, asw_file_req)
+//                    }
+//                    return true
+//                } else {
+//                    get_file()
+//                    return false
+//                }
+//            }
+//
+//            //Getting webview rendering progress
+//            override fun onProgressChanged(view: WebView, p: Int) {
+////                if (ASWP_PBAR) {
+////                    asw_progress.progress = p
+////                    if (p == 100) {
+////                        asw_progress.progress = 0
+////                    }
+////                }
+//            }
+//
+//            // overload the geoLocations permissions prompt to always allow instantly as app permission was granted previously
+////            override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
+////                if (Build.VERSION.SDK_INT < 23 || check_permission(1)) {
+////                    // location permissions were granted previously so auto-approve
+////                    callback.invoke(origin, true, false)
+////                } else {
+////                    // location permissions not granted so request them
+////                    ActivityCompat.requestPermissions(this@MainActivity, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), loc_perm)
+////                }
+////            }
+//        }
 
 
 
@@ -249,15 +259,7 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
 
 
 
-        FirebaseInstanceId.getInstance().instanceId.addOnSuccessListener(this@MainActivity,
-            OnSuccessListener<InstanceIdResult> { instanceIdResult ->
-                val token = instanceIdResult.token
-                webinterface.token = token
-                val preference=getSharedPreferences(resources.getString(R.string.app_name), Context.MODE_PRIVATE)
-                val editor=preference.edit()
-                editor.putString("Token",token)
-                editor.apply()
-            })
+
 
 
         //wb_view.loadData("javascript:localStorage.setItem('test','firebasetest')");
@@ -291,35 +293,35 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
     }
 
 
-    //Checking permission for storage and camera for writing and uploading images
-    fun get_file() {
-        val perms = arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.CAMERA)
-
-        //Checking for storage permission to write images for upload
-        if (ASWP_FUPLOAD && ASWP_CAMUPLOAD && !check_permission(2) && !check_permission(3)) {
-            ActivityCompat.requestPermissions(this@MainActivity, perms, file_perm)
-
-            //Checking for WRITE_EXTERNAL_STORAGE permission
-        } else if (ASWP_FUPLOAD && !check_permission(2)) {
-            ActivityCompat.requestPermissions(this@MainActivity, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE), file_perm)
-
-            //Checking for CAMERA permissions
-        } else if (ASWP_CAMUPLOAD && !check_permission(3)) {
-            ActivityCompat.requestPermissions(this@MainActivity, arrayOf(Manifest.permission.CAMERA), file_perm)
-        }
-    }
-
-    //Checking if particular permission is given or not
-    fun check_permission(permission: Int): Boolean {
-        when (permission) {
-            //1 -> return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
-            2 -> return ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-
-            3 -> return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        }
-        return false
-    }
+//    //Checking permission for storage and camera for writing and uploading images
+//    fun get_file() {
+//        val perms = arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.CAMERA)
+//
+//        //Checking for storage permission to write images for upload
+//        if (ASWP_FUPLOAD && ASWP_CAMUPLOAD && !check_permission(2) && !check_permission(3)) {
+//            ActivityCompat.requestPermissions(this@MainActivity, perms, file_perm)
+//
+//            //Checking for WRITE_EXTERNAL_STORAGE permission
+//        } else if (ASWP_FUPLOAD && !check_permission(2)) {
+//            ActivityCompat.requestPermissions(this@MainActivity, arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE), file_perm)
+//
+//            //Checking for CAMERA permissions
+//        } else if (ASWP_CAMUPLOAD && !check_permission(3)) {
+//            ActivityCompat.requestPermissions(this@MainActivity, arrayOf(Manifest.permission.CAMERA), file_perm)
+//        }
+//    }
+//
+//    //Checking if particular permission is given or not
+//    fun check_permission(permission: Int): Boolean {
+//        when (permission) {
+//            //1 -> return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+//
+//            2 -> return ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+//
+//            3 -> return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+//        }
+//        return false
+//    }
 
 
 
@@ -475,12 +477,10 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
 
                     wb_view.loadUrl("https://app-dev.gokozo.com/index1.html" + deepLink.path)
 
-                    //pendingDynamicLinkData.getLink().
+
                 }else {
 
                     wb_view.loadUrl("https://app-dev.gokozo.com/index1.html")
-//                    mMVM.getMovieDatails(this, mov_id)
-//                    mMVM.getSpShowTimes(this, null, mov_id, schID, false)
                 }
             }
             .addOnFailureListener(this) { e -> }
@@ -489,8 +489,17 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
 
     override fun openCamera() {
 
-
-
+        if(Build.VERSION.SDK_INT > Build.VERSION_CODES.M){
+            if(checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_DENIED &&
+                checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED){
+                val permission = arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                requestPermissions(permission, 222)
+            }else {
+                pickImageFromCamera()
+            }
+        }else {
+            pickImageFromCamera()
+        }
     }
 
 
@@ -499,29 +508,67 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
-
-
-        EasyPermissions.onRequestPermissionsResult(requestCode, permissions, grantResults, MainActivity@this)
-//        when(requestCode){
-//
-//
-//            456 -> {
-//                if(grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED){
-//                    pickImageFromGallery()
-//                }else {
-//                    Toast.makeText(this, "Permission Denied" , Toast.LENGTH_LONG).show()
-//                }
-//            }
-//        }
+        when(requestCode){
+            456 -> {
+                if(grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED){
+                    pickImageFromGallery()
+                }else {
+                    Toast.makeText(this, "Please enable the permission to upload photos from the gallery" , Toast.LENGTH_LONG).show()
+                }
+            }
+            222 -> {
+                if(grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED){
+                    pickImageFromCamera()
+                }else {
+                    Toast.makeText(this, "Please enable the permission to upload photo from the camera" , Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     private fun pickImageFromGallery() {
         val intent = Intent(Intent.ACTION_PICK)
         intent.type ="image/*"
-        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-        intent.action = Intent.ACTION_GET_CONTENT
+        //intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        //intent.action = Intent.ACTION_GET_CONTENT
         startActivityForResult(intent, 123)
     }
+
+
+
+
+
+
+    private fun pickImageFromCamera() {
+        cam_file = createPhotoFile()
+        cam_photo_path = cam_file.absolutePath
+        var cv = ContentValues()
+        cv.put(MediaStore.Images.Media.TITLE, "New Pic")
+        cv.put(MediaStore.Images.Media.DESCRIPTION, "done")
+        //var uri_photo = FileProvider.getUriForFile(MainActivity@this, "com.binarynumbers.gokozo.fileprovider", cam_file)
+        cam_uri_photo= contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,cv)!!
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        intent.putExtra(MediaStore.EXTRA_OUTPUT, cam_uri_photo)
+        startActivityForResult(intent, 111)
+    }
+
+
+    private fun createPhotoFile() : File {
+        val name = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+        val storeDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+
+        try {
+            cam_file = File.createTempFile(name, ".jpg", storeDir)
+        }catch (e : IOException){
+
+        }
+
+        Log.e(TAG , "File " + cam_file.absolutePath)
+
+        return cam_file
+    }
+
+
 
 
     override fun openGallery() {
@@ -542,21 +589,27 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
         if(resultCode == Activity.RESULT_OK && requestCode == 123){
 
 
-            //val filePath = intent?.data?.let { getRealPathFromURIPath(it, MainActivity@this) }
-
 
             try{
 
                 bitmap = MediaStore.Images.Media.getBitmap(contentResolver, intent?.data)
 
-                imageToString()
 
-                val path = ImageFilePath.getPath(MainActivity@this, intent?.data)
+
+                //val path = ImageFilePath.getPath(MainActivity@this, intent?.data)
+                if(bitmap.height > 1000){
+                    bitmap = bitmap.scale(1000)
+                }
+
+                val tempUri = getImageUri()
+                val path = ImageFilePath.getPath(MainActivity@this, tempUri)
+
 
                 var file = File(path)
 
                 val propertyImage = RequestBody.create(MediaType.parse("image/*"), file)
                 val p = MultipartBody.Part.createFormData("file", file.name, propertyImage)
+                mPD.show()
                 mCD.add(mSAPI.uploadImage(p)
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
@@ -570,128 +623,71 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
 
 
 
-            //val surveyImagesParts = arrayOf(MultipartBody.Part);
 
-
-
-
-            //val file = File()
-
-            //val propertyImageFile = File()
-
-//    var propertyImagePart = MultipartBody.Part.createFormData("PropertyImage", propertyImageFile.getName(), propertyImage);
-//
-//    val surveyImagesParts = MultipartBody.Part[surveyModel.getPicturesList().size()];
-//
-//    for (int index = 0; index < surveyModel.getPicturesList().size(); index++) {
-//        Log.d(TAG, "requestUploadSurvey: survey image " + index + "  " + surveyModel.getPicturesList().get(index).getImagePath());
-//        File file = new File(surveyModel.getPicturesList().get(index).getImagePath());
-//        RequestBody surveyBody = RequestBody.create(MediaType.parse("image/*"), file);
-//        surveyImagesParts[index] = MultipartBody.Part.createFormData("SurveyImage", file.getName(), surveyBody);
-//    }
-//
-//    final WebServicesAPI webServicesAPI = RetrofitManager.getInstance().getRetrofit().create(WebServicesAPI.class);
-//    Call<UploadSurveyResponseModel> surveyResponse = null;
-//    if (surveyImagesParts != null) {
-//        surveyResponse = webServicesAPI.uploadSurvey(surveyImagesParts, propertyImagePart, draBody);
-//    }
-//    surveyResponse.enqueue(this);
         }
+        else if(resultCode == Activity.RESULT_OK && requestCode == 111){
+
+            Log.e(TAG, "hello all")
+            try{
+
+                bitmap = MediaStore.Images.Media.getBitmap(contentResolver, cam_uri_photo)
+
+                if(bitmap.height > 1000){
+                    bitmap = bitmap.scale(1000)
+                }
+
+                val tempUri = getImageUri()
+                val path = ImageFilePath.getPath(MainActivity@this, tempUri)
+
+                var file = File(path)
+
+                val propertyImage = RequestBody.create(MediaType.parse("image/*"), file)
+                val p = MultipartBody.Part.createFormData("file", file.name, propertyImage)
+                mPD.show()
+                mCD.add(mSAPI.uploadImage(p)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe ({res -> onImageUploadRes(res)}, {e -> onGetError(e)}))
 
 
-
-//        if (Build.VERSION.SDK_INT >= 21) {
-//            window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-//            if (Build.VERSION.SDK_INT >= 23) {
-//                window.statusBarColor =
-//                    this.getResources().getColor(R.color.colorPrimary, this.getTheme())
-//            } else {
-//                window.statusBarColor = this.getResources().getColor(R.color.colorPrimary)
-//            }
-//            var results: Array<Uri>? = null
-//            if (resultCode == Activity.RESULT_OK) {
-//                if (requestCode == asw_file_req) {
-//                    if (null == asw_file_path) {
-//                        return
-//                    }
-//
-//
-//
-//                    if (intent == null || intent.data == null) {
-//                        if (asw_cam_message != null) {
-//                            results = arrayOf(Uri.parse(asw_cam_message))
-//                        }
-//                    } else {
-//
-//
-//
-//
-//                        val dataString = intent.dataString
-//                        if (dataString != null) {
-//                            results = arrayOf(Uri.parse(dataString))
-//                        } else {
-//                            if (ASWP_MULFILE) {
-////                                if (intent.clipData != null) {
-////                                    val numSelectedFiles = intent.clipData!!.itemCount
-////                                    for (i in 0 until numSelectedFiles) {
-////                                        results[i] = intent.clipData!!.getItemAt(i).uri
-////                                    }
-////                                }
-//                            }
-//                        }
-//                    }
-//
-//
-//                }
-//            }
-//
-//
-//
-//
-//
-//            /*Thread({
-//
-//            }).start()
-//*/
-//
-//        }
-
-    }
-
-
-    private fun imageToString() : String{
-        val barray = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 100 , barray)
-        val imgByte = barray.toByteArray()
-        return MediaStore.Images.Media.insertImage(contentResolver, bitmap,"Title",null)
-
-    }
-
-     private fun getRealPathFromURIPath(contentURI : Uri , activity : Activity) : String {
-        var cursor = activity?.contentResolver?.query(contentURI, null, null, null, null)
-        if (cursor == null) {
-            return contentURI.path.toString()
-        } else {
-            cursor.moveToFirst()
-            val idx = cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA)
-            return cursor.getString(idx)
+            }catch (e : IOException){
+                print(e.toString())
+            }
         }
     }
+
+
+
+
+    private fun getImageUri() : Uri{
+        val bytes = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 5, bytes)
+        val path = MediaStore.Images.Media.insertImage(contentResolver, bitmap, "CameraImage", null)
+        return Uri.parse(path)
+    }
+
+
+
+
 
     private fun onGetError(e: Throwable?) {
-        print(e)
+        mPD.dismiss()
+        Toast.makeText(MainActivity@this, ""+e.toString(), Toast.LENGTH_LONG).show()
     }
 
     private fun onImageUploadRes(res: Response<ImageRes>?) {
-
+        mPD.dismiss()
 
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            Log.e(TAG, "Build.VERSION.SDK_INT")
             webView?.evaluateJavascript("javascript:setImage(\"" + res?.body()?.data?.image_path + "\");") {
                 v ->
                 print(v)
+                Log.e(TAG, "webView")
             }
         } else {
+            Log.e(TAG, "Build.VERSION.SDK_INT")
             webView?.loadUrl("javascript:setImage(\"" + res?.body()?.data?.image_path + "\");")
         }
 
@@ -700,7 +696,37 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
 
     }
 
+    fun Bitmap.scale(maxWidthAndHeight:Int):Bitmap{
+        var newWidth = 0
+        var newHeight = 0
 
+        if (this.width >= this.height){
+            val ratio:Float = this.width.toFloat() / this.height.toFloat()
+
+            newWidth = maxWidthAndHeight
+            // Calculate the new height for the scaled bitmap
+            newHeight = Math.round(maxWidthAndHeight / ratio)
+        }else{
+            val ratio:Float = this.height.toFloat() / this.width.toFloat()
+
+            // Calculate the new width for the scaled bitmap
+            newWidth = Math.round(maxWidthAndHeight / ratio)
+            newHeight = maxWidthAndHeight
+        }
+
+        return Bitmap.createScaledBitmap(
+            this,
+            newWidth,
+            newHeight,
+            false
+        )
+    }
+
+
+    private fun iniProgress() {
+        mPD = ProgressDialog(MainActivity@this)
+        mPD.setMessage("Uploading Image...")
+    }
 }
 
 

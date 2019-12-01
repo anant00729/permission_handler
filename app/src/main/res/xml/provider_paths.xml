@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <paths xmlns:android="http://schemas.android.com/apk/res/android">
-        <cache-path name="shared_images" path="images/"/>
+<!--    <paths xmlns:android="http://schemas.android.com/apk/res/android">-->
+<!--        <cache-path name="shared_images" path="images/"/>-->
+<!--    </paths>-->
+<!--    <external-path-->
+<!--            name="gozo_image"-->
+<!--            path="/storage/emulated/0/Android/data/com.binarynumbers.gokozo/files/Pictures"-->
+<!--            />-->
+
+    <paths>
+        <external-path name="InstructiveRide" path="Android/data/com.binarynumbers.gokozo/files/Pictures"/>
     </paths>
 </resources>
