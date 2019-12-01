@@ -490,8 +490,8 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
     override fun openCamera() {
 
         if(Build.VERSION.SDK_INT > Build.VERSION_CODES.M){
-            if(checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_DENIED &&
-                checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED){
+            if(checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_DENIED /*||
+                checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED*/){
                 val permission = arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 requestPermissions(permission, 222)
             }else {
