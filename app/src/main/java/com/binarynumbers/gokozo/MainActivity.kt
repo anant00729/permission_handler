@@ -7,6 +7,7 @@ import android.app.ProgressDialog
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
@@ -19,6 +20,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.KeyEvent.KEYCODE_BACK
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
@@ -110,6 +112,8 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
         var webinterface = WebInterface(this, this)
         wb_view.addJavascriptInterface(WebInterface(this, this), "Android")
 
+
+
         setting.loadWithOverviewMode = true
         setting.useWideViewPort = true
         setting.domStorageEnabled = true
@@ -132,15 +136,35 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
         webView?.setOnLongClickListener { true }
         webView?.isHapticFeedbackEnabled = false
 
+
+
+        wb_view?.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                val preference=getSharedPreferences(resources.getString(R.string.app_name), Context.MODE_PRIVATE)
+                val token = preference.getString("Token", "")!!
+                if(token.isNotEmpty()){
+                    setFCMToken(token , Build.MODEL , "Android" )
+                }
+            }
+        }
+
+        val preference=getSharedPreferences(resources.getString(R.string.app_name), Context.MODE_PRIVATE)
+
         FirebaseInstanceId.getInstance().instanceId.addOnSuccessListener(this@MainActivity,
             OnSuccessListener<InstanceIdResult> { instanceIdResult ->
                 val token = instanceIdResult.token
                 webinterface.token = token
-                val preference=getSharedPreferences(resources.getString(R.string.app_name), Context.MODE_PRIVATE)
                 val editor=preference.edit()
+
+                setFCMToken(token , Build.MODEL , "Android" )
+
                 editor.putString("Token",token)
                 editor.apply()
             })
+
+
+
+
 
 
 
@@ -267,6 +291,19 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
 
 
 
+    }
+
+    private fun setFCMToken(token : String , deviceModel : String, deviceType : String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            Log.e(TAG, "Build.VERSION.SDK_INT")
+            webView?.evaluateJavascript("javascript:setFireBaseToken(\"${token}\",\"${deviceModel}\",\"${deviceType}\");") { v ->
+                print(v)
+                Log.e(TAG, "webView")
+            }
+        } else {
+            Log.e(TAG, "Build.VERSION.SDK_INT")
+            webView?.loadUrl("javascript:setFireBaseToken(\"${token}\",\"${deviceModel}\",\"${deviceType}\")")
+        }
     }
 
 
@@ -583,6 +620,8 @@ class MainActivity : AppCompatActivity(), OnContentShare, OnExitCalled{
             pickImageFromGallery()
         }
     }
+
+
 
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, intent: Intent?) {

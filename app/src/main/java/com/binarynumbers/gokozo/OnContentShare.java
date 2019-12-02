@@ -6,4 +6,5 @@ public interface OnContentShare {
     void onShareLink(String link);
     void openCamera();
     void openGallery();
+
 }

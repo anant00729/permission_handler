@@ -5,6 +5,8 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import static androidx.constraintlayout.widget.Constraints.TAG;
 
@@ -82,6 +84,8 @@ public class WebInterface {
 //    public String setImage(String image) {
 //        return "Android";
 //    }
+
+
 
 
 
